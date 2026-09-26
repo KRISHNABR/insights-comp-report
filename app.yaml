@@ -31,14 +31,11 @@ access:
   # The roles it ACTS with when reading restricted data come from the grant in
   # the platform registry, written by the dataset owner - never from this file.
   # If they came from here, a team could unmask salaries by editing its own repo.
-  roles: []
 
 # -----------------------------------------------------------------------------
 # RUNTIME
 # -----------------------------------------------------------------------------
 runtime:
-  sdk: ">=0.1,<1"
-  base: python-data              # pandas/pyarrow preinstalled; no web server
   size: medium
 
 # -----------------------------------------------------------------------------
@@ -87,12 +84,6 @@ job:
 # and its retention; the platform decides where it physically lives and who can
 # read it (the same groups as access.manage).
 # -----------------------------------------------------------------------------
-outputs:
-  - name: weekly-equity-summary
-    kind: file                   # file | dataset | notification
-    format: csv
-    retention: 90d               # the platform expires it; you don't cron a cleanup
-
 # -----------------------------------------------------------------------------
 # ENVIRONMENTS
 # -----------------------------------------------------------------------------
