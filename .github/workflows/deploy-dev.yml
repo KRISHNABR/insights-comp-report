@@ -1,0 +1,18 @@
+# Generated. Do not edit.
+#
+# dev deploys itself on every merge to main - app.yaml says auto_deploy: true.
+# Nobody approves a dev deploy; that's the point of having a dev.
+name: deploy-dev
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: insights-hub/insights-platform/.github/workflows/deploy.yml@v1
+    with:
+      app: comp-report
+      environment: dev
+    secrets: inherit

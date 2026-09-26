@@ -1,0 +1,23 @@
+# Generated. Do not edit.
+#
+# uat is deliberately manual. The approver list is NOT configured here - the
+# platform reconciles the GitHub environment's reviewers from
+# access.manage.contributors in app.yaml, so who-can-promote and who-owns-the-app
+# cannot drift apart.
+name: deploy-uat
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: commit or tag to promote (defaults to the last dev deploy)
+        required: false
+
+jobs:
+  deploy:
+    uses: insights-hub/insights-platform/.github/workflows/deploy.yml@v1
+    with:
+      app: comp-report
+      environment: uat
+      ref: ${{ inputs.ref }}
+    secrets: inherit

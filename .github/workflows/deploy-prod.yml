@@ -1,0 +1,22 @@
+# Generated. Do not edit.
+#
+# prod promotes an artefact that already passed uat - it does not rebuild.
+# Approvers come from access.manage.owners. The change window is enforced
+# platform-side, not by asking people to be careful.
+name: deploy-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: commit or tag to promote (must already be live in uat)
+        required: true
+
+jobs:
+  deploy:
+    uses: insights-hub/insights-platform/.github/workflows/deploy.yml@v1
+    with:
+      app: comp-report
+      environment: prod
+      ref: ${{ inputs.ref }}
+    secrets: inherit

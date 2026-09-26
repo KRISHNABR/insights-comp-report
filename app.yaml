@@ -1,23 +1,94 @@
-# People Analytics. Reads the most sensitive dataset the platform holds.
-# NOTE: this manifest does NOT declare classification - see docs/adr/ADR-002.
-# Classification is a property of the dataset in the platform catalog, so a
-# tenant cannot downgrade sensitivity by editing their own file.
+# =============================================================================
+# comp-report - a scheduled job that reads the most sensitive dataset on the
+# platform.
+#
+# NOTE what is NOT here: the word `classification`. Sensitivity is a property of
+# the DATA, recorded in the platform registry by the data's owner. A team cannot
+# downgrade its own data by editing a file in its own repo - the manifest loader
+# rejects the key, and so does CI. See ADR-002.
+# =============================================================================
+
 apiVersion: v1
 app: comp-report
 team: people-analytics
 kind: job
 
-schedule: "0 6 * * MON"         # jobs only
+# -----------------------------------------------------------------------------
+# ACCESS
+# -----------------------------------------------------------------------------
+access:
 
-owners:
-  - MG-PEOPLE-ANALYTICS
+  manage:
+    owners:
+      - MG-PEOPLE-ANALYTICS
+    contributors:
+      - MG-PEOPLE-ANALYTICS-ENG
+    readers: []                  # deliberately empty. Nobody outside the team
+                                 # needs to watch this job, and "readers" still
+                                 # see telemetry.
 
+  # A scheduled job has no interactive user, so it declares no runtime roles.
+  # The roles it ACTS with when reading restricted data come from the grant in
+  # the platform registry, written by the dataset owner - never from this file.
+  # If they came from here, a team could unmask salaries by editing its own repo.
+  roles: []
+
+# -----------------------------------------------------------------------------
+# RUNTIME
+# -----------------------------------------------------------------------------
 runtime:
   sdk: ">=0.1,<1"
+  base: python-data              # pandas/pyarrow preinstalled; no web server
+  size: medium
 
+# -----------------------------------------------------------------------------
+# DATA
+# -----------------------------------------------------------------------------
 data:
-  - dataset: hr.compensation    # catalog marks this restricted -> triggers the restricted tier
-    access: read
+  - dataset: hr.compensation     # restricted in the registry. Declaring it is
+    access: read                 # NOT enough - the dataset owner must also grant
+                                 # it. Both keys, or the read fails.
 
-access:
-  roles: [comp-analyst]
+# -----------------------------------------------------------------------------
+# JOB - only for kind: job. This is the operational contract: what the platform
+# guarantees, and what it will do to you when something goes wrong.
+# -----------------------------------------------------------------------------
+job:
+  schedule: "0 6 * * MON"        # cron, in the timezone below
+  timezone: Europe/Dublin        # explicit. "UTC vs local" causes a real
+                                 # incident roughly once per platform.
+  timeout: 30m                   # SIGTERM at 30m, SIGKILL 30s later
+  retries: 2                     # on a non-zero exit, with backoff
+  concurrency: forbid            # forbid | allow. `forbid` skips this run if the
+                                 # previous one is still going - which is what
+                                 # you want for anything that writes.
+  catchup: false                 # if the platform was down at 06:00, do NOT
+                                 # fire a burst of missed runs on recovery
+  on_failure: notify-owners      # after the last retry, page access.manage.owners
+
+# -----------------------------------------------------------------------------
+# OUTPUTS - what this job produces. Declared, not wired: you name the artefact
+# and its retention; the platform decides where it physically lives and who can
+# read it (the same groups as access.manage).
+# -----------------------------------------------------------------------------
+outputs:
+  - name: weekly-equity-summary
+    kind: file                   # file | dataset | notification
+    format: csv
+    retention: 90d               # the platform expires it; you don't cron a cleanup
+
+# -----------------------------------------------------------------------------
+# ENVIRONMENTS
+# -----------------------------------------------------------------------------
+environments:
+  dev:
+    auto_deploy: true
+    schedule_enabled: false      # deploy it, but don't let it fire on its own in
+                                 # dev. Run it by hand with `insights run`.
+  uat:
+    auto_deploy: false
+    approvers: contributors
+  prod:
+    auto_deploy: false
+    approvers: owners
+    change_window: business-hours
