@@ -1,9 +1,8 @@
 # Generated. Do not edit.
 #
-# dev deploys itself on every merge to main - app.yaml says auto_deploy: true.
-# Nobody approves a dev deploy; that's the point of having a dev.
+# dev deploys itself on every merge to main — app.yaml says auto_deploy: true.
+# Nobody approves a dev deploy; that is what dev is for.
 name: deploy-dev
-
 on:
   push:
     branches: [main]
@@ -11,7 +10,7 @@ on:
 
 jobs:
   deploy:
-    uses: insights-hub/insights-platform/.github/workflows/deploy.yml@v1
+    uses: KRISHNABR/insights-platform/.github/workflows/deploy.yml@v1
     with:
       app: comp-report
       environment: dev

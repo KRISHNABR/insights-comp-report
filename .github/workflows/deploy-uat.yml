@@ -1,11 +1,9 @@
 # Generated. Do not edit.
 #
-# uat is deliberately manual. The approver list is NOT configured here - the
-# platform reconciles the GitHub environment's reviewers from
-# access.manage.contributors in app.yaml, so who-can-promote and who-owns-the-app
-# cannot drift apart.
+# Deliberately manual. The approver list is NOT configured here — the platform
+# reconciles the GitHub environment's reviewers from access.manage.contributors in
+# app.yaml, so who-can-promote and who-owns-the-app cannot drift apart.
 name: deploy-uat
-
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +13,7 @@ on:
 
 jobs:
   deploy:
-    uses: insights-hub/insights-platform/.github/workflows/deploy.yml@v1
+    uses: KRISHNABR/insights-platform/.github/workflows/deploy.yml@v1
     with:
       app: comp-report
       environment: uat
