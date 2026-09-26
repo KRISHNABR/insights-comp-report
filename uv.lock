@@ -152,8 +152,8 @@ wheels = [
 
 [[package]]
 name = "insights-sdk"
-version = "0.1.0"
-source = { git = "https://github.com/KRISHNABR/insights-sdk.git?tag=v1#d7540935771c14e8aa5634ba3801ed89f4202690" }
+version = "0.2.0"
+source = { git = "https://github.com/KRISHNABR/insights-sdk.git?tag=v1#d66f3a2e2c3ed2791b99ead9becb4277d184f8ce" }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
