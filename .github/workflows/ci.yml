@@ -1,0 +1,15 @@
+# Generated. Do not edit.
+#
+# Four lines of tenant-owned CI. Manifest validation, entitlement checks against the
+# catalog, the SDK support-window check, build, registration and deploy all live in the
+# platform's reusable workflow - so improving the pipeline is one commit, not 12.
+#
+# You own your code. We own the road it travels on.
+name: ci
+on: [push, pull_request]
+
+jobs:
+  deploy:
+    uses: insights-hub/insights-platform/.github/workflows/deploy.yml@v1
+    with:
+      app: comp-report

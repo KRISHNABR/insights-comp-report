@@ -1,0 +1,23 @@
+# People Analytics. Reads the most sensitive dataset the platform holds.
+# NOTE: this manifest does NOT declare classification - see docs/adr/ADR-002.
+# Classification is a property of the dataset in the platform catalog, so a
+# tenant cannot downgrade sensitivity by editing their own file.
+apiVersion: v1
+app: comp-report
+team: people-analytics
+kind: job
+
+schedule: "0 6 * * MON"         # jobs only
+
+owners:
+  - MG-PEOPLE-ANALYTICS
+
+runtime:
+  sdk: ">=0.1,<1"
+
+data:
+  - dataset: hr.compensation    # catalog marks this restricted -> triggers the restricted tier
+    access: read
+
+access:
+  roles: [comp-analyst]
