@@ -64,13 +64,18 @@ pins its base, so a rollback gets the image you actually had.
 1. Declare it in `app.yaml` under `connections:` — engine, host, and the **name** of a
    secret. Never the value: this file is in git, and a credential here is a credential
    in the history forever. The loader refuses one.
-2. Put the value in the secret store at `insights/comp-report/<secret-name>`. Your team
-   writes it. **The platform team cannot read it** — an explicit IAM Deny, not a
-   promise.
-3. `uv run insights connections --probe` to check it works.
+2. **Locally**, put the value in `.env` in this repo:
 
-Locally, write the value to the fake store; `insights connections` prints the exact
-path.
+   ```
+   my-warehouse-token=any-local-value
+   ```
+
+   `.env` is gitignored and CI refuses a committed one. Commit `.env.example`.
+3. **In dev and prod**, your team writes it to `insights/comp-report/<secret-name>` in the
+   secret store. The platform binds your app's identity to that path and **cannot
+   read the value** — an explicit IAM Deny, not a promise. `.env` is not read outside
+   local, so a stray one cannot become a production credential.
+4. `uv run insights connections --probe` to check it works.
 
 ---
 
@@ -117,7 +122,7 @@ uv run insights upgrade-scaffold             # update them, then review the diff
 | It started, something is off | `insights logs --app comp-report` |
 | A query is failing | `insights connections --probe` |
 | Is it even deployed? | `insights status` |
-| What has it been doing? | the console, at `/a/console/` |
+| What has it been doing? | the console, at `/apps/console/` |
 
 A connection error tells you **who fixes it**: an expired credential is yours, a TLS
 or VPC routing failure is ours. If it says ours, tell us and paste the error.
@@ -128,6 +133,7 @@ or VPC routing failure is ours. If it says ours, tell us and paste the error.
 
 - **Do not edit `.github/workflows/`** — platform-owned, and overwritten on upgrade.
 - **Do not put a credential in `app.yaml`** — CI refuses it, and git remembers anyway.
+- **Do not commit `.env`** — CI refuses that too. `.env.example` is the committed one.
 - **Do not run as root in your Dockerfile** — CI refuses it.
 - **Do not add a second logger.** `get_logger()` refuses to emit a payload; a
   `logging.getLogger` beside it is an unenforced second path out of the process.

@@ -8,3 +8,6 @@ build/
 # local stub state - regenerate with `insights up`
 *.db
 sinks/
+
+# YOUR LOCAL SECRETS. Never commit this.
+.env
