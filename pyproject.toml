@@ -27,12 +27,26 @@ package = false          # an app, not a library - nothing to publish
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 
-[tool.uv.sources]
-# LOCAL DEVELOPMENT ONLY. During development the four repos sit side by side, and this
-# app should build against the SDK in the checkout next to it rather than the last
-# published release - otherwise you cannot test an SDK change without publishing it.
+# ---------------------------------------------------------------------------
+# WHERE THE SDK COMES FROM
 #
-# In a real registry-backed environment this block is removed and the version range in
-# [project.dependencies] does the work. That range is the actual contract; this is a
-# development convenience (ADR-001).
-insights-sdk = { path = "../insights-sdk", editable = true }
+# The version range above is the CONTRACT - a floor, not a pin (ADR-001). This
+# block only says where to FETCH a version satisfying it.
+#
+# In an organisation with an internal package index this block is DELETED, and
+# the index is configured once for everyone:
+#
+#     [[tool.uv.index]]
+#     name = "internal"
+#     url  = "https://artifacts.corp.example/simple"
+#
+# This submission has no index, so the git tag stands in for one. `v1` is a
+# MOVING major tag: re-locking picks up patches and minors, and a breaking change
+# means cutting v2 rather than moving it. Same argument as the version floor, and
+# the same as the reusable workflow's @v1.
+#
+# It must NOT be a local path. A tenant clones only their own repo, so a path
+# source resolves on the platform team's machine and nowhere else.
+# ---------------------------------------------------------------------------
+[tool.uv.sources]
+insights-sdk = { git = "https://github.com/KRISHNABR/insights-sdk.git", tag = "v1" }
