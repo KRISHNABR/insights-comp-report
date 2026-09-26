@@ -22,7 +22,7 @@ the interesting example. None of the machinery that makes that safe appears in t
 | Timeout, retries, concurrency control, catch-up suppression | |
 | Data access, the owner's grant check, field masking | |
 | Structured logs, metrics, an audit record per read | |
-| The container image, and four pipelines across three environments | |
+| Four pipelines across three environments. The image is ours to build, `FROM` a base they patch | |
 
 ---
 
