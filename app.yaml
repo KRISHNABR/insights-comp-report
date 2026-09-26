@@ -1,101 +1,99 @@
 # =============================================================================
-# comp-report - a scheduled job that reads the most sensitive dataset on the
-# platform.
+# comp-report — a scheduled job that reads compensation data.
 #
-# NOTE what is NOT here: the word `classification`. Sensitivity is a property of
-# the DATA, recorded in the platform registry by the data's owner. A team cannot
-# downgrade its own data by editing a file in its own repo - the manifest loader
-# rejects the key, and so does CI. See ADR-002.
+# This file is the ONLY configuration this app has. Everything in it is
+# a DECLARATION: what we need and who owns it. Nothing here is mechanism —
+# no connection string, no IAM role, no pipeline.
+#
+# Full schema reference: docs/APP-YAML.md in the platform repo.
 # =============================================================================
 
 apiVersion: v1
-app: comp-report
+app: comp-report                 # must match the repo and the deploy workflow
 team: people-analytics
-kind: job
+kind: job                        # web | job
 
 # -----------------------------------------------------------------------------
-# ACCESS
+# ACCESS — three tiers, and there is no fourth.
+#
+# They NEST: an owner satisfies every check a contributor does, and a contributor
+# every check a reader does. So nobody is listed twice, and nobody is locked out
+# because somebody forgot to list them.
+#
+# These are corporate groups, never individuals — individuals leave, and an app
+# owned by someone who left is an orphan. The loader refuses anything with an "@".
+#
+# They do two jobs at once: the edge uses their union to decide who may reach the
+# app at all, and `require_role("owner"|"contributor"|"reader")` checks them inside
+# your code. The deploy pipeline also reconciles them into GitHub environment
+# reviewers, so the right to own an app and the right to promote it cannot drift.
 # -----------------------------------------------------------------------------
 access:
-
   manage:
-    owners:
-      - MG-PEOPLE-ANALYTICS
-    contributors:
-      - MG-PEOPLE-ANALYTICS-ENG
-    readers: []                  # deliberately empty. Nobody outside the team
-                                 # needs to watch this job, and "readers" still
-                                 # see telemetry.
-
-  # A scheduled job has no interactive user, so it declares no runtime roles.
-  # The roles it ACTS with when reading restricted data come from the grant in
-  # the platform registry, written by the dataset owner - never from this file.
-  # If they came from here, a team could unmask salaries by editing its own repo.
+    owners:       [MG-PEOPLE-ANALYTICS]        # approve prod · change access · answer for it
+    contributors: [MG-PEOPLE-ANALYTICS-ENG]    # deploy dev and uat · read logs · NOT prod
+    readers:      []                           # deliberately empty: nobody outside the
+                                               # team needs to see this one
 
 # -----------------------------------------------------------------------------
-# RUNTIME
+# RUNTIME — how much of the machine this gets.
+#
+# `size` is the only thing here. The Python version lives in the Dockerfile and
+# the SDK version in pyproject.toml, because a second copy of either would drift.
 # -----------------------------------------------------------------------------
 runtime:
-  size: medium
+  size: medium                   # small | medium | large -> cpu / memory / replicas
 
 # -----------------------------------------------------------------------------
-# DATA
-# -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# CONNECTIONS - the systems this app talks to.
+# CONNECTIONS — the systems this app talks to.
 #
-# We already have access to this warehouse; People Analytics granted it to our
-# service identity in the data platform, not here. What the platform gives us is
-# the connector, the credential plumbing and an error message that says which of
-# the two of us has to fix it.
+# We already have access to this warehouse: People Analytics' grants say so, and
+# that is true whether or not this platform exists. What the platform gives us is
+# the driver, somewhere safe for the credential, and an error message that says
+# whether a failure is ours or theirs.
 #
-# `secret` is a NAME. The value lives at insights/comp-report/hr-warehouse-token,
-# writable by our group and readable by our app's identity - and by nobody on the
-# platform team, which is enforced by an IAM Deny rather than by a promise.
-# A credential written here would be in git history forever, so the manifest
-# loader refuses one.
+# THIS BLOCK DESCRIBES PRODUCTION. Anything that varies per environment is a
+# ${VAR} the platform injects at deploy time — so one manifest covers dev, uat
+# and prod without three copies of anything.
 # -----------------------------------------------------------------------------
 connections:
-  - name: hr-warehouse
-    engine: sqlite               # databricks-sql in dev and prod; see environments
-    path: ../insights-platform/runtime/fakes/warehouse/warehouse.db
+  - name: hr-warehouse           # what you pass to connect("hr-warehouse")
+    engine: databricks-sql       # databricks-sql | redshift | postgres | rest | sqlite
+    host: ${HR_WAREHOUSE_HOST}
+    http_path: ${HR_WAREHOUSE_HTTP_PATH}
+    timeout: 30                  # seconds
+
+    # `secret:` is a NAME, never a value. The value lives at
+    #     insights/comp-report/hr-warehouse-token
+    # written by our group, readable by this app's identity (sp-comp-report) and
+    # by nobody on the platform team — an explicit IAM Deny, not a promise.
+    #
+    # app.yaml is in git, so a password typed here is a password in the history
+    # forever. The loader refuses `password`, `token`, `api_key`, `dsn` and friends.
     secret: hr-warehouse-token
-    timeout: 30
+
+    # ...and this is what it is on a laptop, where there is no Databricks.
+    # Applied ONLY when INSIGHTS_ENV=local, so it cannot make dev behave unlike
+    # prod. Fields named here override; everything else (the secret, the timeout)
+    # is inherited. `insights up` and `insights run` set INSIGHTS_WAREHOUSE_PATH.
+    local:
+      engine: sqlite
+      path: ${INSIGHTS_WAREHOUSE_PATH}
 
 # -----------------------------------------------------------------------------
-# JOB - only for kind: job. This is the operational contract: what the platform
-# guarantees, and what it will do to you when something goes wrong.
+# JOB — only for kind: job. The operational contract: what the platform
+# guarantees, and what it does to you when something goes wrong.
 # -----------------------------------------------------------------------------
 job:
   schedule: "0 6 * * MON"        # cron, in the timezone below
-  timezone: Europe/Dublin        # explicit. "UTC vs local" causes a real
-                                 # incident roughly once per platform.
+  timezone: Europe/Dublin        # explicit. "UTC vs local" causes a real incident
+                                 # roughly once per platform.
   timeout: 30m                   # SIGTERM at 30m, SIGKILL 30s later
   retries: 2                     # on a non-zero exit, with backoff
   concurrency: forbid            # forbid | allow. `forbid` skips this run if the
-                                 # previous one is still going - which is what
-                                 # you want for anything that writes.
-  catchup: false                 # if the platform was down at 06:00, do NOT
-                                 # fire a burst of missed runs on recovery
+                                 # previous one is still going — what you want for
+                                 # anything that writes. Held in the scheduler's own
+                                 # state, so it survives a scheduler restart.
+  catchup: false                 # if the platform was down at 06:00, do NOT fire a
+                                 # burst of missed runs on recovery
   on_failure: notify-owners      # after the last retry, page access.manage.owners
-
-# -----------------------------------------------------------------------------
-# OUTPUTS - what this job produces. Declared, not wired: you name the artefact
-# and its retention; the platform decides where it physically lives and who can
-# read it (the same groups as access.manage).
-# -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# ENVIRONMENTS
-# -----------------------------------------------------------------------------
-environments:
-  dev:
-    auto_deploy: true
-    schedule_enabled: false      # deploy it, but don't let it fire on its own in
-                                 # dev. Run it by hand with `insights run`.
-  uat:
-    auto_deploy: false
-    approvers: contributors
-  prod:
-    auto_deploy: false
-    approvers: owners
-    change_window: business-hours
