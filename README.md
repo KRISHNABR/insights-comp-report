@@ -81,7 +81,7 @@ wants a half-finished report emailing people at 06:00.
 ```mermaid
 flowchart TB
   S["platform scheduler<br/><i>06:00 Monday, Europe/Dublin</i>"] --> C["start our container"]
-  C --> I["<b>service identity</b>: svc:comp-report<br/><i>there is no logged-in human at 06:00</i>"]
+  C --> I["<b>service identity</b>: sp-comp-report<br/><i>there is no logged-in human at 06:00</i>"]
   I --> M["main() runs"]
   M --> Q["query('hr.compensation', sql)"]
 
@@ -106,29 +106,32 @@ The scheduler retries 1 and 2 differently, because a refusal will not fix itself
 
 ## Why this example is the interesting one
 
-### Declaring a restricted dataset is not enough
+### Our job runs as its own identity, and that is the point
 
-Two keys, and we hold only one:
+A 06:00 run has no logged-in human, so it acts as **`sp-comp-report`** — derived by the platform
+from our registered app name. We do not declare it and cannot change it.
 
-| Key | Who holds it | Where |
-|---|---|---|
-| "we need this data" | **us** | `data:` in our `app.yaml` |
-| "you may have it" | the **dataset owner** | a grant in the platform registry — in production, Unity Catalog |
+That matters because data access is granted *to an identity*. If we could name our own, we could
+claim another app's and inherit whatever it can read.
 
-The platform team cannot supply the second key. They do not own the data.
+People Analytics granted `sp-comp-report` read access on `hr.compensation` **in the data
+platform** — not here. The platform cannot grant it and has no command that pretends to:
 
-### Our unmasking role comes from the grant, not from us
+```bash
+uv run insights access        # prints exactly what to ask, and who to ask
+```
 
-This is the subtle one, and it was found by building rather than designing.
+`insights doctor` checks that the grant exists, so a missing one fails at our desk rather than at
+06:00 on Monday.
 
-A scheduled job has no human, so *"may this caller see salaries?"* cannot be answered from
-corporate groups. The tempting fix is to read `access.roles` from our own manifest — but that
-file is in **our** repository, so we could unmask compensation by editing one line of our own
-YAML.
+### Masking is the data platform's job, not ours
 
-So the roles a job acts with come from the **grant**, written by the data owner. Notice our
-manifest has `roles: []`. Remove `roles: [comp-analyst]` from the grant and this same job gets
-`base_salary: "***"` — with no change to anything we control.
+In production, column masks are applied by the data platform per principal — so whatever
+`sp-comp-report` may see is what we get, and a notebook reading the same table sees the same
+thing. Our manifest has no say in it at all.
+
+That is worth noticing because it is what makes the design safe *without* extra machinery: there
+is nothing in this repo we could edit to widen what we read.
 
 ### Our telemetry cannot leak compensation
 
@@ -176,7 +179,7 @@ flowchart LR
 | Concern | Local | Production | Changes in `src/` |
 |---|---|---|---|
 | Scheduling | Python cron matcher | EventBridge Scheduler → ECS RunTask | nothing |
-| **M2M identity** | scheduler builds `svc:comp-report` | **workload identity federation** from the task role — OIDC, no stored secret | nothing |
+| **M2M identity** | scheduler builds `sp-comp-report` | **workload identity federation** from the task role — OIDC, no stored secret | nothing |
 | Data | SQLite | Databricks SQL Warehouse | nothing |
 | **Masking** | the SDK applies it | **Unity Catalog** applies it, per principal | nothing |
 | **The grant** | `grants.yaml` | a Unity Catalog `GRANT`, owned by People Analytics | nothing |
