@@ -26,3 +26,13 @@ package = false          # an app, not a library - nothing to publish
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.uv.sources]
+# LOCAL DEVELOPMENT ONLY. During development the four repos sit side by side, and this
+# app should build against the SDK in the checkout next to it rather than the last
+# published release - otherwise you cannot test an SDK change without publishing it.
+#
+# In a real registry-backed environment this block is removed and the version range in
+# [project.dependencies] does the work. That range is the actual contract; this is a
+# development convenience (ADR-001).
+insights-sdk = { path = "../insights-sdk", editable = true }
