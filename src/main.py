@@ -1,34 +1,37 @@
 """Weekly compensation equity summary — a scheduled job on Insights Hub.
 
-The second archetype. Same SDK, same broker, same rules. The differences are
-`kind: job` in the manifest and `run_job` instead of `web_app`.
+The second archetype: `kind: job` in the manifest, `run_job` instead of `web_app`.
 
-This reads the most sensitive dataset on the platform, and none of the machinery
-that makes that safe appears here: the owner's grant, the masking rules, the
-sensitive-field list and the audit record all live on the platform side. This
-team writes the query and the arithmetic.
+We read compensation data we already have access to. People Analytics granted it to
+this app's service identity in the data platform — not on this platform, which owns
+no data and grants nothing. What we inherit here is the connector, a credential we
+never see the value of, the schedule, and telemetry.
+
+Note what the platform does NOT see: the SQL below, or a single row it returns. It
+records that a query ran on `hr-warehouse`, how long it took and how many rows came
+back. The numbers are ours.
 """
 
-from insights_sdk import get_logger, output, query, run_job
+from insights_sdk import connect, get_logger, output, run_job
 
 log = get_logger()
 
 
 def main() -> None:
-    rows = query(
-        "hr.compensation",
-        "SELECT dept, base_salary FROM hr.compensation",
+    # Our connection, declared in app.yaml. The credential is resolved from the
+    # secret store using this app's own identity; it never appears in this file, in
+    # the manifest, or in any log line.
+    warehouse = connect("hr-warehouse")
+
+    rows = warehouse.query(
+        "SELECT dept, base_salary FROM hr_compensation",
     )
 
     # Individual rows never leave this function, and could not be logged if we
-    # tried: the logger raises on a payload, and raises again on any mention of a
-    # field name belonging to a restricted dataset.
+    # tried: the logger raises on a payload.
     by_dept: dict[str, list[int]] = {}
     for row in rows:
-        salary = row["base_salary"]
-        if salary == "***":
-            continue                    # this run was not granted the unmasking role
-        by_dept.setdefault(row["dept"], []).append(salary)
+        by_dept.setdefault(row["dept"], []).append(row["base_salary"])
 
     summary = [
         {

@@ -44,10 +44,26 @@ runtime:
 # -----------------------------------------------------------------------------
 # DATA
 # -----------------------------------------------------------------------------
-data:
-  - dataset: hr.compensation     # restricted in the registry. Declaring it is
-    access: read                 # NOT enough - the dataset owner must also grant
-                                 # it. Both keys, or the read fails.
+# -----------------------------------------------------------------------------
+# CONNECTIONS - the systems this app talks to.
+#
+# We already have access to this warehouse; People Analytics granted it to our
+# service identity in the data platform, not here. What the platform gives us is
+# the connector, the credential plumbing and an error message that says which of
+# the two of us has to fix it.
+#
+# `secret` is a NAME. The value lives at insights/comp-report/hr-warehouse-token,
+# writable by our group and readable by our app's identity - and by nobody on the
+# platform team, which is enforced by an IAM Deny rather than by a promise.
+# A credential written here would be in git history forever, so the manifest
+# loader refuses one.
+# -----------------------------------------------------------------------------
+connections:
+  - name: hr-warehouse
+    engine: sqlite               # databricks-sql in dev and prod; see environments
+    path: ../insights-platform/runtime/fakes/warehouse/warehouse.db
+    secret: hr-warehouse-token
+    timeout: 30
 
 # -----------------------------------------------------------------------------
 # JOB - only for kind: job. This is the operational contract: what the platform
